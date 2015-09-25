@@ -1,0 +1,41 @@
+
+#include <Python.h>
+
+static PyModuleDef ppcap_module = {
+	PyModuleDef_HEAD_INIT,
+	"packet", NULL,
+	-1,
+	NULL, NULL, NULL, NULL,
+	NULL
+};
+
+PyObject *PyExc_Ppcap;
+
+PyMODINIT_FUNC PyInit_packet(void)
+{
+	PyObject *module;
+
+	module = PyModule_Create(&ppcap_module);
+	if (!module)
+		return NULL;
+	if (!ppcap_add_type(module))
+		return NULL;
+	if (!packet_add_type(module))
+		return NULL;
+	if (!ethernet_add_type(module))
+		return NULL;
+	if (!arp_add_type(module))
+		return NULL;
+	if (!ip_add_type(module))
+		return NULL;
+	if (!tcp_add_type(module))
+		return NULL;
+	if (!udp_add_type(module))
+		return NULL;
+	/*
+	 * Create the Ppcap exception.
+	 */
+	PyExc_Ppcap = PyErr_NewException("packet.ppcap", NULL, NULL);
+	
+	return module;
+}

@@ -35,7 +35,7 @@ static PyMethodDef packet_methods[] = {
 
 PyTypeObject packet_type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"lsb.packet",              /* tp_name */
+	"packet.packet",           /* tp_name */
     sizeof(packet),            /* tp_basicsize */
     0,                         /* tp_itemsize */
     0, 						   /* tp_dealloc */

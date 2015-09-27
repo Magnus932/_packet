@@ -21,6 +21,14 @@ static PyObject *arp_get_dst_ip(arp *self,
 						 		void *closure);
 static int arp_set_dst_ip(arp *self, PyObject *value,
 				   		  void *closure);
+static PyObject *arp_to_bytes(arp *self);
+
+static PyMethodDef arp_methods[] = {
+	{ "to_bytes", (PyCFunction)arp_to_bytes,
+	   METH_NOARGS, NULL
+	},
+	{ NULL }
+};
 
 static PyMemberDef arp_members[] = {
 	{ "arp_hw_size", T_UBYTE, arp_offset(hw_size),
@@ -34,13 +42,13 @@ static PyMemberDef arp_members[] = {
 
 static PyGetSetDef arp_gs[] = {
 	{ "arp_hw_type", (getter)arp_get_attr,
-	  (setter)arp_set_attr, NULL, "arp_hw_type"
+	  (setter)arp_set_attr, NULL, ARP_HW_TYPE
 	},
 	{ "arp_proto", (getter)arp_get_attr,
-	  (setter)arp_set_attr, NULL, "arp_proto"
+	  (setter)arp_set_attr, NULL, ARP_PROTO
 	},
 	{ "arp_opcode", (getter)arp_get_attr,
-	  (setter)arp_set_attr, NULL, "arp_opcode"
+	  (setter)arp_set_attr, NULL, ARP_OPCODE
 	},
 	{ "arp_src_mac", (getter)arp_get_src_mac,
 	  (setter)arp_set_src_mac, NULL, NULL
@@ -59,7 +67,7 @@ static PyGetSetDef arp_gs[] = {
 
 PyTypeObject arp_type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"ppcap.arp", 		       /* tp_name */
+	"packet.arp", 		       /* tp_name */
     sizeof(arp),	           /* tp_basicsize */
     0,                         /* tp_itemsize */
     0, 						   /* tp_dealloc */
@@ -86,7 +94,7 @@ PyTypeObject arp_type = {
     0,                         /* tp_weaklistoffset */
     0,                         /* tp_iter */
     0,                         /* tp_iternext */
-    0,			               /* tp_methods */
+    arp_methods,			   /* tp_methods */
     arp_members,			   /* tp_members */
     arp_gs,                    /* tp_getset */
     0,                         /* tp_base */
@@ -104,11 +112,11 @@ extern PyTypeObject ethernet_type;
 static PyObject *arp_get_attr(arp *self,
 							  void *closure)
 {
-	if (!strncmp(closure, "arp_hw_type", strlen(closure)))
+	if (closure == ARP_HW_TYPE)
 		return PyLong_FromLong(ntohs(self->__arp.hw_type));
-	if (!strncmp(closure, "arp_proto", strlen(closure)))
+	if (closure == ARP_PROTO)
 		return PyLong_FromLong(ntohs(self->__arp.proto));
-	if (!strncmp(closure, "arp_opcode", strlen(closure)))
+	if (closure == ARP_OPCODE)
 		return PyLong_FromLong(ntohs(self->__arp.opcode));
 
 	Py_RETURN_NONE;
@@ -120,19 +128,19 @@ static int arp_set_attr(arp *self,
 {
 	if (!value) {
 		PyErr_Format(PyExc_AttributeError, "attribute '%s' can not"
-					 " be deleted", (char *)closure);
+					 " be deleted", arp_attr_string(closure));
 		return -1;
 	}
 	if (!PyLong_Check(value)) {
 		PyErr_Format(PyExc_TypeError, "attribute '%s' expects"
-					 " a type of 'int'", (char *)closure);
+					 " a type of 'int'", arp_attr_string(closure));
 		return -1;
 	}
-	if (!strncmp(closure, "arp_hw_type", strlen(closure)))
+	if (closure == ARP_HW_TYPE)
 		self->__arp.hw_type = htons(PyLong_AsLong(value));
-	else if (!strncmp(closure, "arp_proto", strlen(closure)))
+	else if (closure == ARP_PROTO)
 		self->__arp.proto = htons(PyLong_AsLong(value));
-	else if (!strncmp(closure, "arp_opcode", strlen(closure)))
+	else if (closure == ARP_OPCODE)
 		self->__arp.opcode = htons(PyLong_AsLong(value));
 
 	return 0;
@@ -283,7 +291,7 @@ static int arp_set_dst_mac(arp *self, PyObject *value,
 						"must be of type tuple");
 		return -1;
 	}
-	if (!PyArg_ParseTuple(value, "iiiiii", &a, &b, &c, &d,
+	if (!PyArg_ParseTuple(value, "BBBBBB", &a, &b, &c, &d,
 						  &e, &f))
 		return -1;
 	self->__arp.dst_mac[0] = a;
@@ -319,4 +327,36 @@ PyObject *create_arp_instance(int caplen,
 		   (pkt + sizeof(struct ethernet)),
 		    sizeof(struct arp));
 	return obj;	
+}
+
+static PyObject *arp_to_bytes(arp *self)
+{
+	PyObject *obj;
+	int size;
+	char *buf;
+
+	size = sizeof(struct ethernet) + sizeof(struct arp);
+	buf = (char *)malloc(size);
+
+	memcpy(buf, &ETHERNET_CAST(self)->__ethernet,
+		   sizeof(struct ethernet));
+	memcpy((buf + sizeof(struct ethernet)),
+		   &self->__arp,
+		   sizeof(struct arp));
+	obj = PyBytes_FromStringAndSize(buf, size);
+	free(buf);
+	
+	return obj;
+}
+
+char *arp_attr_string(void *closure)
+{
+	if (closure == ARP_HW_TYPE)
+		return "arp_hw_type";
+	if (closure == ARP_PROTO)
+		return "arp_proto";
+	if (closure == ARP_OPCODE)
+		return "arp_opcode";
+
+	return NULL;
 }

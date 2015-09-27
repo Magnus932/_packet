@@ -13,6 +13,7 @@ static PyObject *ip_get_dest(ip *self,
 					  		 void *closure);
 static int ip_set_dest(ip *self, PyObject *value,
 			    	   void *closure);
+static PyObject *ip_to_bytes(ip *self);
 
 static PyMemberDef ip_members[] = {
 	{ "ip_dsf", T_UBYTE, ip_offset(dsf),
@@ -27,24 +28,31 @@ static PyMemberDef ip_members[] = {
 	{ NULL }
 };
 
+static PyMethodDef ip_methods[] = {
+	{ "to_bytes", (PyCFunction)ip_to_bytes,
+	   METH_NOARGS, NULL
+	},
+	{ NULL }
+};
+
 static PyGetSetDef ip_gs[] = {
 	{ "ip_hlen", (getter)ip_get_attr,
-	  (setter)ip_set_attr, NULL, "ip_hlen"
+	  (setter)ip_set_attr, NULL, IP_HLEN
 	},
 	{ "ip_version", (getter)ip_get_attr,
-	  (setter)ip_set_attr, NULL, "ip_version"
+	  (setter)ip_set_attr, NULL, IP_VERSION
 	},
 	{ "ip_len", (getter)ip_get_attr,
-	  (setter)ip_set_attr, NULL, "ip_len"
+	  (setter)ip_set_attr, NULL, IP_LEN
 	},
 	{ "ip_identifier", (getter)ip_get_attr,
-	  (setter)ip_set_attr, NULL, "ip_identifier"
+	  (setter)ip_set_attr, NULL, IP_IDENTIFIER
 	},
 	{ "ip_frag_off", (getter)ip_get_attr,
-	  (setter)ip_set_attr, NULL, "ip_frag_off"
+	  (setter)ip_set_attr, NULL, IP_FRAG_OFF
 	},
 	{ "ip_csum", (getter)ip_get_attr,
-	  (setter)ip_set_attr, NULL, "ip_csum"
+	  (setter)ip_set_attr, NULL, IP_CSUM
 	},
 	{ "ip_source", (getter)ip_get_source,
 	  (setter)ip_set_source, NULL, NULL
@@ -57,13 +65,13 @@ static PyGetSetDef ip_gs[] = {
 
 PyTypeObject ip_type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"ppcap.ip", 		       /* tp_name */
+	"packet.ip", 		       /* tp_name */
     sizeof(ip),		           /* tp_basicsize */
     0,                         /* tp_itemsize */
     0, 						   /* tp_dealloc */
     0,                         /* tp_print */
-    0,				           /* tp_getattr */
-    0, 				           /* tp_setattr */
+    0,				           /* tp_getclosure */
+    0, 				           /* tp_setclosure */
     0,                         /* tp_reserved */
     0,                         /* tp_repr */
     0,                         /* tp_as_number */
@@ -72,8 +80,8 @@ PyTypeObject ip_type = {
     0,                         /* tp_hash  */
     0,                         /* tp_call */
     0,                         /* tp_str */
-    0,                         /* tp_getattro */
-    0,                         /* tp_setattro */
+    0,                         /* tp_getclosureo */
+    0,                         /* tp_setclosureo */
     0,                         /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT |
     Py_TPFLAGS_BASETYPE,  	   /* tp_flags */
@@ -102,17 +110,17 @@ extern PyTypeObject ethernet_type;
 static PyObject *ip_get_attr(ip *self,
 							 void *closure)
 {
-	if (!strncmp(closure, "ip_hlen", strlen(closure)))
+	if (closure == IP_HLEN)
 		return PyLong_FromLong(self->__ip.hlen);
-	if (!strncmp(closure, "ip_version", strlen(closure)))
+	if (closure == IP_VERSION)
 		return PyLong_FromLong(self->__ip.version);
-	if (!strncmp(closure, "ip_len", strlen(closure)))
+	if (closure == IP_LEN)
 		return PyLong_FromLong(ntohs(self->__ip.len));
-	if (!strncmp(closure, "ip_identifier", strlen(closure)))
+	if (closure == IP_IDENTIFIER)
 		return PyLong_FromLong(ntohs(self->__ip.identifier));
-	if (!strncmp(closure, "ip_frag_off", strlen(closure)))
+	if (closure == IP_FRAG_OFF)
 		return PyLong_FromLong(ntohs(self->__ip.frag_off));
-	if (!strncmp(closure, "ip_csum", strlen(closure)))
+	if (closure == IP_CSUM)
 		return PyLong_FromLong(ntohs(self->__ip.csum));
 
 	Py_RETURN_NONE;
@@ -123,25 +131,25 @@ static int ip_set_attr(ip *self, PyObject *value,
 {
 	if (!value) {
 		PyErr_Format(PyExc_AttributeError, "attribute '%s' can not"
-					 " be deleted", (char *)closure);
+					 " be deleted", ip_attr_string(closure));
 		return -1;
 	}
 	if (!PyLong_Check(value)) {
 		PyErr_Format(PyExc_TypeError, "attribute '%s' expects"
-					 " type 'int'", (char *)closure);
+					 " type 'int'", ip_attr_string(closure));
 		return -1;
 	}
-	if (!strncmp(closure, "ip_hlen", strlen(closure)))
+	if (closure == IP_HLEN)
 		self->__ip.hlen = PyLong_AsLong(value);
-	else if (!strncmp(closure, "ip_version", strlen(closure)))
+	else if (closure == IP_VERSION)
 		self->__ip.version = PyLong_AsLong(value);
-	else if (!strncmp(closure, "ip_len", strlen(closure)))
+	else if (closure == IP_LEN)
 		self->__ip.len = htons(PyLong_AsLong(value));
-	else if (!strncmp(closure, "ip_identifier", strlen(closure)))
+	else if (closure == IP_IDENTIFIER)
 		self->__ip.identifier = htons(PyLong_AsLong(value));
-	else if (!strncmp(closure, "ip_frag_off", strlen(closure)))
+	else if (closure == IP_FRAG_OFF)
 		self->__ip.frag_off = htons(PyLong_AsLong(value));
-	else if (!strncmp(closure, "ip_csum", strlen(closure)))
+	else if (closure == IP_CSUM)
 		self->__ip.csum = htons(PyLong_AsLong(value));
 
 	return 0;
@@ -209,12 +217,12 @@ static int ip_set_dest(ip *self, PyObject *value,
 	in_addr_t ip;
 
 	if (!value) {
-		PyErr_SetString(PyExc_AttributeError, "attribute 'ip_dest'"
+		PyErr_SetString(PyExc_AttributeError, "closureibute 'ip_dest'"
 						" can not be deleted");
 		return -1;
 	}
 	if (!PyUnicode_Check(value)) {
-		PyErr_SetString(PyExc_TypeError, "attribute 'ip_dest' expects "
+		PyErr_SetString(PyExc_TypeError, "closureibute 'ip_dest' expects "
 						"type 'string'");
 		return -1;
 	}
@@ -256,4 +264,42 @@ PyObject *create_ip_instance(int caplen,
 		   (pkt + sizeof(struct ethernet)),
 		    sizeof(struct ip));
 	return obj;
+}
+
+static PyObject *ip_to_bytes(ip *self)
+{
+	PyObject *obj;
+	int size;
+	char *buf;
+
+	size = sizeof(struct ethernet) + sizeof(struct ip);
+	buf = (char *)malloc(size);
+
+	memcpy(buf, &ETHERNET_CAST(self)->__ethernet,
+		   sizeof(struct ethernet));
+	memcpy(buf + sizeof(struct ethernet),
+		   &self->__ip,
+		   sizeof(struct ip));
+	obj = PyBytes_FromStringAndSize(buf, size);
+	free(buf);
+
+	return obj;
+}
+
+char *ip_attr_string(void *closure)
+{
+	if (closure == IP_HLEN)
+		return "ip_hlen";
+	if (closure == IP_VERSION)
+		return "ip_version";
+	if (closure == IP_LEN)
+		return "ip_len";
+	if (closure == IP_IDENTIFIER)
+		return "ip_identifier";
+	if (closure == IP_FRAG_OFF)
+		return "ip_frag_off";
+	if (closure == IP_CSUM)
+		return "ip_csum";
+
+	return NULL;
 }

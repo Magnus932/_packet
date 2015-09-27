@@ -19,6 +19,12 @@
 #define PKT_IS_UDP_DESC		"Validates if a packet is of type " \
 							"udp"
 
+#define ETHERNET_CAST(x)	((ethernet *)x)
+#define ARP_CAST(x)			((arp *)x)
+#define IP_CAST(x)			((ip *)x)
+#define UDP_CAST(x)			((udp *)x)
+#define TCP_CAST(x)			((tcp *)x)
+
 typedef struct {
 	PyObject_HEAD
 } packet;

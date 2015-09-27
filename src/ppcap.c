@@ -49,7 +49,7 @@ static PyMethodDef ppcap_methods[] = {
 
 static PyTypeObject ppcap_type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"ppcap.ppcap",             /* tp_name */
+	"packet.ppcap",            /* tp_name */
     sizeof(ppcap),             /* tp_basicsize */
     0,                         /* tp_itemsize */
     0, 						   /* tp_dealloc */

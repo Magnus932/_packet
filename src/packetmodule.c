@@ -1,7 +1,7 @@
 
-#include <Python.h>
+#include "include/packetmodule.h"
 
-static PyModuleDef ppcap_module = {
+static PyModuleDef packet_module = {
 	PyModuleDef_HEAD_INIT,
 	"packet", NULL,
 	-1,
@@ -15,7 +15,7 @@ PyMODINIT_FUNC PyInit_packet(void)
 {
 	PyObject *module;
 
-	module = PyModule_Create(&ppcap_module);
+	module = PyModule_Create(&packet_module);
 	if (!module)
 		return NULL;
 	if (!ppcap_add_type(module))

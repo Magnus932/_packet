@@ -16,6 +16,14 @@ static PyObject *ethernet_get_type(ethernet *self,
 static int ethernet_set_type(ethernet *self,
                              PyObject *value,
                              void *closure);
+static PyObject *ethernet_to_bytes(ethernet *self);
+
+static PyMethodDef ethernet_methods[] = {
+    { "to_bytes", (PyCFunction)ethernet_to_bytes,
+       METH_NOARGS, NULL
+    },
+    { NULL }
+};
 
 static PyGetSetDef ethernet_gs[] = {
     { "ethernet_dst", (getter)ethernet_get_dst,
@@ -35,7 +43,7 @@ static PyGetSetDef ethernet_gs[] = {
 
 PyTypeObject ethernet_type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-	  "ppcap.ethernet",          /* tp_name */
+    "packet.ethernet",         /* tp_name */
     sizeof(ethernet),          /* tp_basicsize */
     0,                         /* tp_itemsize */
     0, 						             /* tp_dealloc */
@@ -209,5 +217,21 @@ PyObject *create_ethernet_instance(int caplen,
     obj = ethernet_type.tp_new(&ethernet_type, NULL, NULL);
     memcpy(&((ethernet *)obj)->__ethernet, pkt,
            sizeof(struct ethernet));
+    return obj;
+}
+
+static PyObject *ethernet_to_bytes(ethernet *self)
+{
+    PyObject *obj;
+    int size;
+    char *buf;
+
+    size = sizeof(struct ethernet);
+    buf = (char *)malloc(size);
+
+    memcpy(buf, &self->__ethernet, size);
+    obj = PyBytes_FromStringAndSize(buf, size);
+    free(buf);
+
     return obj;
 }

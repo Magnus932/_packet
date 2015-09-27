@@ -30,10 +30,18 @@ typedef struct {
 	struct ip __ip;
 } ip;
 
+#define IP_HLEN				(void *)0
+#define IP_VERSION			(void *)1
+#define IP_LEN 				(void *)2
+#define IP_IDENTIFIER 		(void *)3
+#define IP_FRAG_OFF 		(void *)4
+#define IP_CSUM				(void *)5
+
 #define ip_offset(x) (offsetof(ip, __ip) + \
 					  offsetof(struct ip, x))
 int ip_add_type(PyObject *module);
 PyObject *create_ip_instance(int caplen,
 							 const unsigned char *pkt);
+char *ip_attr_string(void *closure);
 
 #endif

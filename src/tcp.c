@@ -2,14 +2,15 @@
 #include "include/tcp.h"
 
 static PyObject *tcp_get_attr(tcp *self,
-							  void *closure);
+                              void *closure);
 static int tcp_set_attr(tcp *self, PyObject *value,
-						void *closure);
+                        void *closure);
 static int tcp_set_payload(tcp *self, PyObject *value,
-						   void *closure);
+                           void *closure);
 static PyObject *tcp_get_flags(tcp *self);
 static PyObject *tcp_set_flags(tcp *self, PyObject *args,
-							   PyObject *kwds);
+                               PyObject *kwds);
+static PyObject *tcp_to_bytes(tcp *self);
 static void tcp_dealloc(tcp *self);
 
 static PyMethodDef tcp_methods[] = {
@@ -19,43 +20,46 @@ static PyMethodDef tcp_methods[] = {
 	{ "tcp_set_flags", (PyCFunction)tcp_set_flags,
 	   METH_VARARGS | METH_KEYWORDS, NULL
 	},
+	{ "to_bytes", (PyCFunction)tcp_to_bytes,
+	   METH_NOARGS, NULL
+	},
 	{ NULL }
 };
 
 static PyGetSetDef tcp_gs[] = {
 	{ "tcp_src", (getter)tcp_get_attr,
-	  (setter)tcp_set_attr, NULL, "tcp_src"
+	  (setter)tcp_set_attr, NULL, TCP_SRC
 	},
 	{ "tcp_dst", (getter)tcp_get_attr,
-	  (setter)tcp_set_attr, NULL, "tcp_dst"
+	  (setter)tcp_set_attr, NULL, TCP_DST
 	},
 	{ "tcp_seq", (getter)tcp_get_attr,
-	  (setter)tcp_set_attr, NULL, "tcp_seq"
+	  (setter)tcp_set_attr, NULL, TCP_SEQ
 	},
 	{ "tcp_seq_ack", (getter)tcp_get_attr,
-	  (setter)tcp_set_attr, NULL, "tcp_seq_ack"
+	  (setter)tcp_set_attr, NULL, TCP_SEQ_ACK
 	},
 	{ "tcp_hlen", (getter)tcp_get_attr,
-	  (setter)tcp_set_attr, NULL, "tcp_hlen"
+	  (setter)tcp_set_attr, NULL, TCP_HLEN
 	},
 	{ "tcp_win", (getter)tcp_get_attr,
-	  (setter)tcp_set_attr, NULL, "tcp_win"
+	  (setter)tcp_set_attr, NULL, TCP_WIN
 	},
 	{ "tcp_csum", (getter)tcp_get_attr,
-	  (setter)tcp_set_attr, NULL, "tcp_csum"
+	  (setter)tcp_set_attr, NULL, TCP_CSUM
 	},
 	{ "tcp_urg_ptr", (getter)tcp_get_attr,
-	  (setter)tcp_set_attr, NULL, "tcp_urg_ptr"
+	  (setter)tcp_set_attr, NULL, TCP_URG_PTR
 	},
 	{ "tcp_payload", (getter)tcp_get_attr,
-	  (setter)tcp_set_payload, NULL, "tcp_payload"
+	  (setter)tcp_set_payload, NULL, TCP_PAYLOAD
 	},
 	{ NULL }
 };
 
 PyTypeObject tcp_type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"ppcap.tcp",               /* tp_name */
+	"packet.tcp",              /* tp_name */
     sizeof(tcp),               /* tp_basicsize */
     0,                         /* tp_itemsize */
     (destructor)tcp_dealloc,   /* tp_dealloc */
@@ -100,23 +104,23 @@ extern PyTypeObject ip_type;
 static PyObject *tcp_get_attr(tcp *self,
 							  void *closure)
 {
-	if (!strncmp(closure, "tcp_src", strlen(closure)))
+	if (closure == TCP_SRC)
 		return PyLong_FromLong(ntohs(self->__tcp.src));
-	if (!strncmp(closure, "tcp_dst", strlen(closure)))
+	if (closure == TCP_DST)
 		return PyLong_FromLong(ntohs(self->__tcp.dst));
-	if (!strncmp(closure, "tcp_seq", strlen(closure)))
+	if (closure == TCP_SEQ)
 		return PyLong_FromLong(ntohl(self->__tcp.seq));
-	if (!strncmp(closure, "tcp_seq_ack", strlen(closure)))
+	if (closure == TCP_SEQ_ACK)
 		return PyLong_FromLong(ntohl(self->__tcp.seq_ack));
-	if (!strncmp(closure, "tcp_hlen", strlen(closure)))
+	if (closure == TCP_HLEN)
 		return PyLong_FromLong(self->__tcp.hlen << 2);
-	if (!strncmp(closure, "tcp_win", strlen(closure)))
+	if (closure == TCP_WIN)
 		return PyLong_FromLong(ntohs(self->__tcp.win_size));
-	if (!strncmp(closure, "tcp_csum", strlen(closure)))
+	if (closure == TCP_CSUM)
 		return PyLong_FromLong(ntohs(self->__tcp.csum));
-	if (!strncmp(closure, "tcp_urg_ptr", strlen(closure)))
+	if (closure == TCP_URG_PTR)
 		return PyLong_FromLong(ntohs(self->__tcp.urg_ptr));
-	if (!strncmp(closure, "tcp_payload", strlen(closure)))
+	if (closure == TCP_PAYLOAD)
 		if (self->payload) {
 			Py_INCREF(self->payload);
 			return self->payload;
@@ -130,29 +134,29 @@ static int tcp_set_attr(tcp *self, PyObject *value,
 {
 	if (!value) {
 		PyErr_Format(PyExc_AttributeError, "attribute '%s' can not be"
-					 " deleted", (char *)closure);
+					 " deleted", tcp_attr_string(closure));
 		return -1;
 	}
 	if (!PyLong_Check(value)) {
 		PyErr_Format(PyExc_TypeError, "attribute '%s' only accepts"
-					 " a type of 'int'");
+					 " a type of 'int'", tcp_attr_string(closure));
 		return -1;
 	}
-	if (!strncmp(closure, "tcp_src", strlen(closure)))
+	if (closure == TCP_SRC)
 		self->__tcp.src = htons(PyLong_AsLong(value));
-	else if (!strncmp(closure, "tcp_dst", strlen(closure)))
+	else if (closure == TCP_DST)
 		self->__tcp.dst = htons(PyLong_AsLong(value));
-	else if (!strncmp(closure, "tcp_seq", strlen(closure)))
+	else if (closure == TCP_SEQ)
 		self->__tcp.seq = htonl(PyLong_AsLong(value));
-	else if (!strncmp(closure, "tcp_seq_ack", strlen(closure)))
+	else if (closure == TCP_SEQ_ACK)
 		self->__tcp.seq_ack = htonl(PyLong_AsLong(value));
-	else if (!strncmp(closure, "tcp_hlen", strlen(closure)))
+	else if (closure == TCP_HLEN)
 		self->__tcp.hlen = PyLong_AsLong(value);
-	else if (!strncmp(closure, "tcp_win", strlen(closure)))
+	else if (closure == TCP_WIN)
 		self->__tcp.win_size = htons(PyLong_AsLong(value));
-	else if (!strncmp(closure, "tcp_csum", strlen(closure)))
+	else if (closure == TCP_CSUM)
 		self->__tcp.csum = htons(PyLong_AsLong(value));
-	else if (!strncmp(closure, "tcp_urg_ptr", strlen(closure)))
+	else if (closure == TCP_URG_PTR)
 		self->__tcp.urg_ptr = htons(PyLong_AsLong(value));
 
 	return 0;
@@ -273,7 +277,7 @@ PyObject *create_tcp_instance(int caplen,
 							  const unsigned char *pkt)
 {
 	PyObject *obj;
-	const char *payload;
+	const unsigned char *payload;
 	int offset;
 
 	obj = tcp_type.tp_new(&tcp_type, NULL, NULL);
@@ -289,9 +293,67 @@ PyObject *create_tcp_instance(int caplen,
 	payload = (pkt + tcp_payload_offset(offset));
 	((tcp *)obj)->payload = PyBytes_FromStringAndSize(payload,
 													  caplen - tcp_payload_offset(offset));
-	if (!((tcp *)obj)->payload) {
-		Py_DECREF(obj);
-		return NULL;
-	}
 	return obj;
+}
+
+static PyObject *tcp_to_bytes(tcp *self)
+{
+	PyObject *obj;
+	Py_ssize_t size, psize;
+	char *buf, *pbuf;
+
+	size = sizeof(struct ethernet) + sizeof(struct ip) +
+	       sizeof(struct tcp);
+	if (self->payload)
+		size += PyBytes_Size(self->payload);
+	buf = (char *)malloc(size);
+
+	memcpy(buf, &ETHERNET_CAST(self)->__ethernet,
+           sizeof(struct ethernet));
+    memcpy((buf + sizeof(struct ethernet)),
+           &IP_CAST(self)->__ip,
+           sizeof(struct ip));
+    memcpy((buf + sizeof(struct ethernet) +
+    	   sizeof(struct ip)),
+           &self->__tcp,
+           sizeof(struct tcp));
+    if (self->payload) {
+    	if (PyBytes_AsStringAndSize(self->payload,
+    		                        &pbuf, &psize) == -1) {
+    		free(buf);
+    		return NULL;
+    	}
+    	memcpy((buf + sizeof(struct ethernet) +
+               sizeof(struct ip) +
+               sizeof(struct tcp)),
+               pbuf, psize);
+    }
+    obj = PyBytes_FromStringAndSize(buf, size);
+    free(buf);
+    
+    return obj;
+}
+
+char *tcp_attr_string(void *closure)
+{
+	if (closure == TCP_SRC)
+		return "tcp_src";
+	if (closure == TCP_DST)
+		return "tcp_dst";
+	if (closure == TCP_SEQ)
+		return "tcp_seq";
+	if (closure == TCP_SEQ_ACK)
+		return "tcp_seq_ack";
+	if (closure == TCP_HLEN)
+		return "tcp_hlen";
+	if (closure == TCP_WIN)
+		return "tcp_win";
+	if (closure == TCP_CSUM)
+		return "tcp_csum";
+	if (closure == TCP_URG_PTR)
+		return "tcp_urg_ptr";
+	if (closure == TCP_PAYLOAD)
+		return "tcp_payload";
+
+	return NULL;
 }

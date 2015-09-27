@@ -7,30 +7,38 @@ static int udp_set_attr(udp *self, PyObject *value,
                         void *closure);
 static int udp_set_payload(udp *self, PyObject *value,
                            void *closure);
+static PyObject *udp_to_bytes(udp *self);
 static void udp_dealloc(udp *self);
+
+static PyMethodDef udp_methods[] = {
+    { "to_bytes", (PyCFunction)udp_to_bytes,
+       METH_NOARGS, NULL
+    },
+    { NULL }
+};
 
 static PyGetSetDef udp_gs[] = {
     { "udp_src", (getter)udp_get_attr,
-      (setter)udp_set_attr, NULL, "udp_src"
+      (setter)udp_set_attr, NULL, UDP_SRC
     },
     { "udp_dst", (getter)udp_get_attr,
-      (setter)udp_set_attr, NULL, "udp_dst"
+      (setter)udp_set_attr, NULL, UDP_DST
     },
     { "udp_len", (getter)udp_get_attr,
-      (setter)udp_set_attr, NULL, "udp_len"
+      (setter)udp_set_attr, NULL, UDP_LEN
     },
     { "udp_csum", (getter)udp_get_attr,
-      (setter)udp_set_attr, NULL, "udp_csum"
+      (setter)udp_set_attr, NULL, UDP_CSUM
     },
     { "udp_payload", (getter)udp_get_attr,
-      (setter)udp_set_payload, NULL, "udp_payload"
+      (setter)udp_set_payload, NULL, UDP_PAYLOAD
     },
     { NULL }
 };
 
 PyTypeObject udp_type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"ppcap.udp",               /* tp_name */
+	"packet.udp",              /* tp_name */
     sizeof(udp),               /* tp_basicsize */
     0,                         /* tp_itemsize */
     (destructor)udp_dealloc,   /* tp_dealloc */
@@ -75,15 +83,15 @@ extern PyTypeObject ip_type;
 static PyObject *udp_get_attr(udp *self,
                               void *closure)
 {
-    if (!strncmp(closure, "udp_src", strlen(closure)))
+    if (closure == UDP_SRC)
         return PyLong_FromLong(ntohs(self->__udp.src));
-    if (!strncmp(closure, "udp_dst", strlen(closure)))
+    if (closure == UDP_DST)
         return PyLong_FromLong(ntohs(self->__udp.dst));
-    if (!strncmp(closure, "udp_len", strlen(closure)))
+    if (closure == UDP_LEN)
         return PyLong_FromLong(ntohs(self->__udp.len));
-    if (!strncmp(closure, "udp_csum", strlen(closure)))
+    if (closure == UDP_CSUM)
         return PyLong_FromLong(ntohs(self->__udp.csum));
-    if (!strncmp(closure, "udp_payload", strlen(closure)))
+    if (closure == UDP_PAYLOAD)
         if (self->payload) {
             Py_INCREF(self->payload);
             return self->payload;
@@ -100,21 +108,21 @@ static int udp_set_attr(udp *self, PyObject *value,
 {
     if (!value) {
         PyErr_Format(PyExc_AttributeError, "attribute '%s' can not"
-                     " be deleted", (char *)closure);
+                     " be deleted", udp_attr_string(closure));
         return -1;
     }
     if (!PyLong_Check(value)) {
         PyErr_Format(PyExc_TypeError, "attribute '%s' only accepts"
-                     " a type of 'int'", (char *)closure);
+                     " a type of 'int'", udp_attr_string(closure));
         return -1;
     }
-    if (!strncmp(closure, "udp_src", strlen(closure)))
+    if (closure == UDP_SRC)
         self->__udp.src = htons(PyLong_AsLong(value));
-    else if (!strncmp(closure, "udp_dst", strlen(closure)))
+    else if (closure == UDP_DST)
         self->__udp.dst = htons(PyLong_AsLong(value));
-    else if (!strncmp(closure, "udp_len", strlen(closure)))
+    else if (closure == UDP_LEN)
         self->__udp.len = htons(PyLong_AsLong(value));
-    else if (!strncmp(closure, "udp_csum", strlen(closure)))
+    else if (closure == UDP_CSUM)
         self->__udp.csum = htons(PyLong_AsLong(value));
     
     return 0;
@@ -175,4 +183,54 @@ PyObject *create_udp_instance(int caplen,
     ((udp *)obj)->payload = PyBytes_FromStringAndSize(payload,
                                                       caplen - udp_payload_offset);
     return obj;
+}
+
+static PyObject *udp_to_bytes(udp *self)
+{
+    PyObject *obj;
+    Py_ssize_t size, psize;
+    char *buf, *pbuf;
+
+    size = sizeof(struct ethernet) + sizeof(struct ip) +
+           sizeof(struct udp);
+    if (self->payload)
+        size += PyBytes_Size(self->payload);
+    buf = (char *)malloc(size);
+
+    memcpy(buf, &ETHERNET_CAST(self)->__ethernet,
+           sizeof(struct ethernet));
+    memcpy((buf + sizeof(struct ethernet)),
+           &IP_CAST(self)->__ip,
+           sizeof(struct ip));
+    memcpy((buf + sizeof(struct ethernet) +
+            sizeof(struct ip)),
+            &self->__udp,
+            sizeof(struct udp));
+    if (self->payload) {
+        if (PyBytes_AsStringAndSize(self->payload,
+                                    &pbuf, &psize) == -1) {
+            free(buf);
+            return NULL;
+        }
+        memcpy((buf + sizeof(struct ethernet) +
+               sizeof(struct ip) +
+               sizeof(struct udp)),
+               pbuf, psize);
+    }
+    obj = PyBytes_FromStringAndSize(buf, size);
+    free(buf);
+    return obj;
+}
+
+char *udp_attr_string(void *closure)
+{
+    if (closure == UDP_SRC)
+        return "udp_src";
+    if (closure == UDP_DST)
+        return "udp_dst";
+    if (closure == UDP_LEN)
+        return "udp_len";
+    if (closure == UDP_CSUM)
+        return "udp_csum";
+    return NULL;
 }

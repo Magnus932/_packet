@@ -47,6 +47,16 @@ typedef struct {
 	PyObject *payload;
 } tcp;
 
+#define TCP_SRC			(void *)0
+#define TCP_DST 		(void *)1
+#define TCP_SEQ 		(void *)2
+#define TCP_SEQ_ACK 	(void *)3
+#define TCP_HLEN 		(void *)4
+#define TCP_WIN 		(void *)5
+#define TCP_CSUM 		(void *)6
+#define TCP_URG_PTR 	(void *)7
+#define TCP_PAYLOAD 	(void *)8
+
 #define tcp_offset(x) (offsetof(tcp, __tcp) + \
 					   offsetof(struct tcp, x))
 #define tcp_payload_offset(x) (sizeof(struct ethernet) + \
@@ -55,5 +65,6 @@ typedef struct {
 int tcp_add_type(PyObject *module);
 PyObject *create_tcp_instance(int caplen,
 							  const unsigned char *pkt);
+char *tcp_attr_string(void *closure);
 
 #endif

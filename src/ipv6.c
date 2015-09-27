@@ -3,7 +3,7 @@
 
 PyTypeObject ipv6_type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"ppcap.ipv6",              /* tp_name */
+	"packet.ipv6",              /* tp_name */
     sizeof(ipv6),              /* tp_basicsize */
     0,                         /* tp_itemsize */
     0,						   /* tp_dealloc */

@@ -10,6 +10,8 @@ static int tcp_set_payload(tcp *self, PyObject *value,
 static PyObject *tcp_get_flags(tcp *self);
 static PyObject *tcp_set_flags(tcp *self, PyObject *args,
                                PyObject *kwds);
+static PyObject *tcp_calc_len(tcp *self);
+static PyObject *tcp_calc_csum(tcp *self);
 static PyObject *tcp_to_bytes(tcp *self);
 static void tcp_dealloc(tcp *self);
 
@@ -20,6 +22,12 @@ static PyMethodDef tcp_methods[] = {
 	{ "tcp_set_flags", (PyCFunction)tcp_set_flags,
 	   METH_VARARGS | METH_KEYWORDS, NULL
 	},
+	{ "calc_len", (PyCFunction)tcp_calc_len,
+	   METH_NOARGS, NULL
+	},
+	{ "calc_csum", (PyCFunction)tcp_calc_csum,
+       METH_NOARGS, NULL
+    },
 	{ "to_bytes", (PyCFunction)tcp_to_bytes,
 	   METH_NOARGS, NULL
 	},
@@ -281,12 +289,12 @@ PyObject *create_tcp_instance(int caplen,
 	int offset;
 
 	obj = tcp_type.tp_new(&tcp_type, NULL, NULL);
-	memcpy(&((ethernet *)obj)->__ethernet, pkt,
+	memcpy(&ETHERNET_CAST(obj)->__ethernet, pkt,
 		   sizeof(struct ethernet));
-	memcpy(&((ip *)obj)->__ip,
+	memcpy(&IP_CAST(obj)->__ip,
 		   (pkt + sizeof(struct ethernet)),
 		    sizeof(struct ip));
-	memcpy(&((tcp *)obj)->__tcp,
+	memcpy(&TCP_CAST(obj)->__tcp,
 		   (pkt + sizeof(struct ethernet) + sizeof(struct ip)),
 		    sizeof(struct tcp));
 	offset = (((tcp *)obj)->__tcp.hlen << 2) - sizeof(struct tcp);
@@ -356,4 +364,73 @@ char *tcp_attr_string(void *closure)
 		return "tcp_payload";
 
 	return NULL;
+}
+
+/*
+ * TCP doesnt contain a length field, so to
+ * minimize the required code in '__ip_calc_len'
+ * we use this routine to just pass the hlen of
+ * the TCP header which is '20' + payload.
+ */
+static PyObject *tcp_calc_len(tcp *self)
+{
+	Py_ssize_t len = 20;
+
+	if (self->payload)
+		len += PyBytes_Size(self->payload);
+	__ip_calc_len(IP_CAST(self), len);
+
+	Py_RETURN_NONE;
+}
+
+/*
+ * High order bits are checked at the end
+ * of the subroutine. I felt like its faster this
+ * way instead of checking for a high bit while
+ * iterating. As long as the packet is <= MTU
+ * 32 bits should be enough to hold the calculations
+ * until the end. If above, the checksum calculation
+ * will overflow 'sum' in the long run. If you plan on
+ * sending >= MTU on the lo interface, you should probably
+ * add a: if (sum > 0xffff) sum = (sum & 0xffff) + (sum >> 16)
+ * line in the data section, or check for 0x80000000 using the AND
+ * operator ( Less usage of the CPU ).
+ */
+u16 __tcp_calc_csum(struct tcp_pseudo *__pse, char *data,
+                    Py_ssize_t len)
+{
+    int i, sum = 0;
+
+    for (i = 0; i < sizeof(struct tcp_pseudo) / 2; i++)
+        sum += ((unsigned short *)__pse)[i];
+    if (data)
+        for (i = 0; i < len / 2; i++)
+            sum += ((unsigned short *)data)[i];
+    while (sum >> 16)
+        sum = (sum & 0xffff) + (sum >> 16);
+
+    return (u16)~sum;
+}
+
+static PyObject *tcp_calc_csum(tcp *self)
+{
+	struct tcp_pseudo __pse;
+	Py_ssize_t len = 0;
+	char *data = NULL;
+
+	__pse.source = IP_CAST(self)->__ip.source;
+	__pse.dest = IP_CAST(self)->__ip.dest;
+	__pse.zero = 0;
+	__pse.proto = IP_CAST(self)->__ip.proto;
+	memcpy(&__pse.tcp_hdr, &self->__tcp,
+           sizeof(struct tcp));
+	if (self->payload)
+		PyBytes_AsStringAndSize(self->payload, &data, &len);
+	__pse.len = htons((self->__tcp.hlen << 2) + len);
+
+	self->__tcp.csum = __tcp_calc_csum(&__pse, data, (len % 2) ?
+                                       len + 1 : len);
+	__ip_calc_csum(&IP_CAST(self)->__ip);
+
+	Py_RETURN_NONE;
 }

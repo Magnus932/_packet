@@ -43,5 +43,7 @@ int ip_add_type(PyObject *module);
 PyObject *create_ip_instance(int caplen,
 							 const unsigned char *pkt);
 char *ip_attr_string(void *closure);
+void __ip_calc_len(ip *self, Py_ssize_t len);
+void __ip_calc_csum(struct ip *ips);
 
 #endif

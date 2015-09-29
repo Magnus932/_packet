@@ -321,9 +321,9 @@ PyObject *create_arp_instance(int caplen,
 	PyObject *obj;
 
 	obj = arp_type.tp_new(&arp_type, NULL, NULL);
-	memcpy(&((ethernet *)obj)->__ethernet, pkt,
+	memcpy(&ETHERNET_CAST(obj)->__ethernet, pkt,
 		   sizeof(struct ethernet));
-	memcpy(&((arp *)obj)->__arp,
+	memcpy(&ARP_CAST(obj)->__arp,
 		   (pkt + sizeof(struct ethernet)),
 		    sizeof(struct arp));
 	return obj;	

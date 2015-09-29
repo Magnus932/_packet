@@ -13,6 +13,8 @@ static PyObject *ip_get_dest(ip *self,
 					  		 void *closure);
 static int ip_set_dest(ip *self, PyObject *value,
 			    	   void *closure);
+static PyObject *ip_calc_len(ip *self);
+static PyObject *ip_calc_csum(ip *self);
 static PyObject *ip_to_bytes(ip *self);
 
 static PyMemberDef ip_members[] = {
@@ -29,6 +31,12 @@ static PyMemberDef ip_members[] = {
 };
 
 static PyMethodDef ip_methods[] = {
+	{ "calc_len", (PyCFunction)ip_calc_len,
+	   METH_NOARGS, NULL
+	},
+	{ "calc_csum", (PyCFunction)ip_calc_csum,
+	   METH_NOARGS, NULL
+	},
 	{ "to_bytes", (PyCFunction)ip_to_bytes,
 	   METH_NOARGS, NULL
 	},
@@ -92,7 +100,7 @@ PyTypeObject ip_type = {
     0,                         /* tp_weaklistoffset */
     0,                         /* tp_iter */
     0,                         /* tp_iternext */
-    0,			               /* tp_methods */
+    ip_methods,			       /* tp_methods */
     ip_members,				   /* tp_members */
     ip_gs,                     /* tp_getset */
     0,                         /* tp_base */
@@ -258,9 +266,9 @@ PyObject *create_ip_instance(int caplen,
 	PyObject *obj;
 
 	obj = ip_type.tp_new(&ip_type, NULL, NULL);
-	memcpy(&((ethernet *)obj)->__ethernet, pkt,
+	memcpy(&ETHERNET_CAST(obj)->__ethernet, pkt,
 		   sizeof(struct ethernet));
-	memcpy(&((ip *)obj)->__ip,
+	memcpy(&IP_CAST(obj)->__ip,
 		   (pkt + sizeof(struct ethernet)),
 		    sizeof(struct ip));
 	return obj;
@@ -303,3 +311,39 @@ char *ip_attr_string(void *closure)
 
 	return NULL;
 }
+
+void __ip_calc_len(ip *self, Py_ssize_t _len)
+{
+	Py_ssize_t len = 20;
+
+	if (_len)
+		len += _len;
+	self->__ip.len = htons(len);
+}
+
+static PyObject *ip_calc_len(ip *self)
+{
+	__ip_calc_len(self, 0);
+
+	Py_RETURN_NONE;
+}
+
+void __ip_calc_csum(struct ip *ips)
+{
+	int i, sum = 0;
+
+	for (i = 0; i < sizeof(struct ip) / 2; i++)
+		sum += ((unsigned short *)ips)[i];
+	while (sum >> 16)
+		sum = (sum & 0xffff) + (sum >> 16);
+
+	ips->csum = (unsigned short)~sum; 
+}
+
+static PyObject *ip_calc_csum(ip *self)
+{
+	__ip_calc_csum(&self->__ip);
+
+	Py_RETURN_NONE;
+}
+

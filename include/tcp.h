@@ -47,6 +47,15 @@ typedef struct {
 	PyObject *payload;
 } tcp;
 
+struct tcp_pseudo {
+	u32 source;
+	u32 dest;
+	u8 zero;
+	u8 proto;
+	u16 len;
+	struct tcp tcp_hdr;
+};
+
 #define TCP_SRC			(void *)0
 #define TCP_DST 		(void *)1
 #define TCP_SEQ 		(void *)2

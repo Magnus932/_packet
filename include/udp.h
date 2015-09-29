@@ -17,6 +17,15 @@ typedef struct {
 	PyObject *payload;
 } udp;
 
+struct udp_pseudo {
+	u32 source;
+	u32 dest;
+	u8 zero;
+	u8 proto;
+	u16 len;
+	struct udp udp_hdr;
+};
+
 #define UDP_SRC			(void *)0
 #define UDP_DST 		(void *)1
 #define UDP_LEN 		(void *)2

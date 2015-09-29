@@ -35,7 +35,7 @@ PyMODINIT_FUNC PyInit_packet(void)
 	/*
 	 * Create the Ppcap exception.
 	 */
-	PyExc_Ppcap = PyErr_NewException("packet.ppcap", NULL, NULL);
+	PyExc_Ppcap = PyErr_NewException("packet.PpcapException", NULL, NULL);
 	
 	return module;
 }

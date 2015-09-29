@@ -7,10 +7,18 @@ static int udp_set_attr(udp *self, PyObject *value,
                         void *closure);
 static int udp_set_payload(udp *self, PyObject *value,
                            void *closure);
+static PyObject *udp_calc_len(udp *self);
+static PyObject *udp_calc_csum(udp *self);
 static PyObject *udp_to_bytes(udp *self);
 static void udp_dealloc(udp *self);
 
 static PyMethodDef udp_methods[] = {
+    { "calc_len", (PyCFunction)udp_calc_len,
+       METH_NOARGS, NULL
+    },
+    { "calc_csum", (PyCFunction)udp_calc_csum,
+       METH_NOARGS, NULL
+    },
     { "to_bytes", (PyCFunction)udp_to_bytes,
        METH_NOARGS, NULL
     },
@@ -65,7 +73,7 @@ PyTypeObject udp_type = {
     0,                         /* tp_weaklistoffset */
     0,                         /* tp_iter */
     0,                         /* tp_iternext */
-    0,  			           /* tp_methods */
+    udp_methods,  			   /* tp_methods */
     0,                    	   /* tp_members */
     udp_gs,                    /* tp_getset */
     0,                         /* tp_base */
@@ -171,12 +179,12 @@ PyObject *create_udp_instance(int caplen,
     const unsigned char *payload;
 
     obj = udp_type.tp_new(&udp_type, NULL, NULL);
-    memcpy(&((ethernet *)obj)->__ethernet, pkt,
+    memcpy(&ETHERNET_CAST(obj)->__ethernet, pkt,
            sizeof(struct ethernet));
-    memcpy(&((ip *)obj)->__ip,
+    memcpy(&IP_CAST(obj)->__ip,
            (pkt + sizeof(struct ethernet)),
             sizeof(struct ip));
-    memcpy(&((udp *)obj)->__udp,
+    memcpy(&UDP_CAST(obj)->__udp,
            (pkt + sizeof(struct ethernet) + sizeof(struct ip)),
             sizeof(struct udp));  
     payload = (pkt + udp_payload_offset);
@@ -233,4 +241,69 @@ char *udp_attr_string(void *closure)
     if (closure == UDP_CSUM)
         return "udp_csum";
     return NULL;
+}
+
+static PyObject *udp_calc_len(udp *self)
+{
+    Py_ssize_t len = 8;
+
+    if (self->payload)
+        len += PyBytes_Size(self->payload);
+    self->__udp.len = htons(len);
+
+    __ip_calc_len(IP_CAST(self), len);
+
+    Py_RETURN_NONE;
+}
+
+/*
+ * High order bits are checked at the end
+ * of the subroutine. I felt like its faster this
+ * way instead of checking for a high bit while
+ * iterating. As long as the packet is <= MTU
+ * 32 bits should be enough to hold the calculations
+ * until the end. If above, the checksum calculation
+ * will overflow 'sum' in the long run. If you plan on
+ * sending >= MTU on the lo interface, you should probably
+ * add a: if (sum > 0xffff) sum = (sum & 0xffff) + (sum >> 16)
+ * line in the data section, or check for 0x80000000 using the AND
+ * operator ( Less usage of the CPU ).
+ */
+u16 __udp_calc_csum(struct udp_pseudo *__pse, char *data,
+                    Py_ssize_t len)
+{
+    int i, sum = 0;
+
+    for (i = 0; i < sizeof(struct udp_pseudo) / 2; i++)
+        sum += ((unsigned short *)__pse)[i];
+    if (data)
+        for (i = 0; i < len / 2; i++)
+            sum += ((unsigned short *)data)[i];
+    while (sum >> 16)
+        sum = (sum & 0xffff) + (sum >> 16);
+
+    return (u16)~sum;
+}
+
+static PyObject *udp_calc_csum(udp *self)
+{
+    struct udp_pseudo __pse;
+    Py_ssize_t len;
+    char *data = NULL;
+
+    __pse.source = IP_CAST(self)->__ip.source;
+    __pse.dest = IP_CAST(self)->__ip.dest;
+    __pse.zero = 0;
+    __pse.proto = IP_CAST(self)->__ip.proto;
+    __pse.len = self->__udp.len;
+    memcpy(&__pse.udp_hdr, &self->__udp,
+           sizeof(struct udp));
+
+    if (self->payload)
+        PyBytes_AsStringAndSize(self->payload, &data, &len);
+    self->__udp.csum = __udp_calc_csum(&__pse, data, (len % 2) ?
+                                       len + 1 : len);
+    __ip_calc_csum(&IP_CAST(self)->__ip);
+
+    Py_RETURN_NONE;
 }

@@ -70,7 +70,7 @@ PyTypeObject ethernet_type = {
     0,                         /* tp_weaklistoffset */
     0,                         /* tp_iter */
     0,                         /* tp_iternext */
-    0,			                   /* tp_methods */
+    ethernet_methods,		   /* tp_methods */
     0,                         /* tp_members */
     ethernet_gs,               /* tp_getset */
     0,                         /* tp_base */
@@ -215,7 +215,7 @@ PyObject *create_ethernet_instance(int caplen,
     PyObject *obj;
 
     obj = ethernet_type.tp_new(&ethernet_type, NULL, NULL);
-    memcpy(&((ethernet *)obj)->__ethernet, pkt,
+    memcpy(&ETHERNET_CAST(obj)->__ethernet, pkt,
            sizeof(struct ethernet));
     return obj;
 }

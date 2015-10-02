@@ -391,7 +391,7 @@ static PyObject *tcp_calc_len(tcp *self)
  * 32 bits should be enough to hold the calculations
  * until the end. If above, the checksum calculation
  * will overflow 'sum' in the long run. If you plan on
- * sending >= MTU on the lo interface, you should probably
+ * sending > MTU on the lo interface, you should probably
  * add a: if (sum > 0xffff) sum = (sum & 0xffff) + (sum >> 16)
  * line in the data section, or check for 0x80000000 using the AND
  * operator ( Less usage of the CPU ).

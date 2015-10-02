@@ -3,7 +3,7 @@
 
 static PyModuleDef packet_module = {
 	PyModuleDef_HEAD_INIT,
-	"packet", NULL,
+	"_packet", NULL,
 	-1,
 	NULL, NULL, NULL, NULL,
 	NULL
@@ -11,7 +11,7 @@ static PyModuleDef packet_module = {
 
 PyObject *PyExc_Ppcap;
 
-PyMODINIT_FUNC PyInit_packet(void)
+PyMODINIT_FUNC PyInit__packet(void)
 {
 	PyObject *module;
 

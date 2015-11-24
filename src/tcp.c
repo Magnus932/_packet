@@ -422,6 +422,7 @@ static PyObject *tcp_calc_csum(tcp *self)
 	__pse.dest = IP_CAST(self)->__ip.dest;
 	__pse.zero = 0;
 	__pse.proto = IP_CAST(self)->__ip.proto;
+	self->__tcp.csum = 0;
 	memcpy(&__pse.tcp_hdr, &self->__tcp,
            sizeof(struct tcp));
 	if (self->payload)

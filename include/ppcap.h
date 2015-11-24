@@ -38,6 +38,7 @@ static PyObject *ppcap_parse_pkt(struct pcap_pkthdr *pkthdr,
 					      		 const u_char *packet);
 static PyObject *ppcap_loop(ppcap *self, PyObject *args);
 static PyObject *ppcap_next(ppcap *self);
+static PyObject *ppcap_setnonblock(ppcap *self, PyObject *args);
 static PyObject *ppcap_set_snaplen(ppcap *self,
 								   PyObject *args);
 static PyObject *ppcap_set_promisc(ppcap *self,

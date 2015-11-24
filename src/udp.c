@@ -296,6 +296,7 @@ static PyObject *udp_calc_csum(udp *self)
     __pse.zero = 0;
     __pse.proto = IP_CAST(self)->__ip.proto;
     __pse.len = self->__udp.len;
+    self->__udp.csum = 0;
     memcpy(&__pse.udp_hdr, &self->__udp,
            sizeof(struct udp));
 

@@ -41,6 +41,9 @@ static PyMethodDef ppcap_methods[] = {
 	{ "next", (PyCFunction)ppcap_next,
 	   METH_NOARGS, NULL
 	},
+	{ "setnonblock", (PyCFunction)ppcap_setnonblock,
+	   METH_VARARGS, NULL
+	},
 	{ "close", (PyCFunction)ppcap_close,
 	   METH_NOARGS, NULL
 	},
@@ -49,7 +52,7 @@ static PyMethodDef ppcap_methods[] = {
 
 static PyTypeObject ppcap_type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	"packet.ppcap",            /* tp_name */
+	"_packet.ppcap",            /* tp_name */
     sizeof(ppcap),             /* tp_basicsize */
     0,                         /* tp_itemsize */
     0, 						   /* tp_dealloc */
@@ -67,7 +70,8 @@ static PyTypeObject ppcap_type = {
     0,                         /* tp_getattro */
     0,                         /* tp_setattro */
     0,                         /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,   	   /* tp_flags */
+    Py_TPFLAGS_DEFAULT |
+    Py_TPFLAGS_BASETYPE,   	   /* tp_flags */
     0,			               /* tp_doc */
     0,                         /* tp_traverse */
     0,                         /* tp_clear */
@@ -438,13 +442,32 @@ static PyObject *ppcap_next(ppcap *self)
 	PyObject *obj;
 
 	if (!ppcap_isset_handle(self->handle)) {
-		PyErr_SetString(PyExc_Ppcap, "pcap handle is not created");
+		PyErr_SetString(PyExc_Ppcap, "pcap handle is not created.");
 		return NULL;
 	}
 	packet = pcap_next(self->handle, &pkthdr);
 	if (packet) {
 		obj = ppcap_parse_pkt(&pkthdr, packet);
 		return obj;
+	}
+	Py_RETURN_NONE;
+}
+
+static PyObject *ppcap_setnonblock(ppcap *self, PyObject *args)
+{
+	int nonblock, retval;
+	char errbuf[PCAP_ERRBUF_SIZE];
+
+	if (!PyArg_ParseTuple(args, "i", &nonblock))
+		return NULL;
+	if (!ppcap_isset_handle(self->handle)) {
+		PyErr_SetString(PyExc_Ppcap, "pcap handle is not created.");
+		return NULL;
+	}
+	retval = pcap_setnonblock(self->handle, nonblock, errbuf);
+	if (retval == -1) {
+		PyErr_Format(PyExc_Ppcap, "%s", errbuf);
+		return NULL;
 	}
 	Py_RETURN_NONE;
 }

@@ -332,6 +332,7 @@ void __ip_calc_csum(struct ip *ips)
 {
 	int i, sum = 0;
 
+	ips->csum = 0;
 	for (i = 0; i < sizeof(struct ip) / 2; i++)
 		sum += ((unsigned short *)ips)[i];
 	while (sum >> 16)
